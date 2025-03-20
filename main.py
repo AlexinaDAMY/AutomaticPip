@@ -7,8 +7,14 @@ import sys
 
 # ---- Set path
 
-inputFile=sys.argv[1]
+#inputFile=sys.argv[1] #Used at the final version
+inputdir="/home/smile/Bureau/TestautoPip/ManonData"
 outdir=sys.argv[2]
+
+#To suppres to didn't keep file generated that user don't want
+currentdir= 'Command permit to have pwd result' #TODO
+tmpdir=currentdir+'/work'
+#TODO suppress tmpdir content (generated in the previous run) VOIR COMMENT ENV INTERACTIF DE CODIUM GERE
 
 # ---- Other variables
 
@@ -27,8 +33,8 @@ outdir=sys.argv[2]
 ############################
 
 #TEMP
-
-file=open(inputFile,"r")
+multiqcPath=inputdir+"/multiqc_fastqc.txt"
+file=open(multiqcPath,"r")
 givedAcc=(file.read()).split("\n")
 file.close()
 givedAcc.sort()
@@ -110,10 +116,10 @@ if header!=multiqcNormalHeader :
     # TODO exit program
 
 
-# .. Make tabs with sample important informations
-# Tabs with multiQC output analyse 
-singleSample=[] # TODO if csv file not used anymore
-pairedSample=[]
+# .. Make tab with sample important informations
+# Tab with multiQC output analyse 
+totSample=[]
+
 
 for line in range(1,len(lines)): 
     infos=(lines[line]).split("\t")
@@ -124,8 +130,10 @@ for line in range(1,len(lines)):
     newEntry.append(infos[0])
 
     # ....newEntry[1] Total sequences count
+    newEntry.append(infos[4])
 
-    # ....newEntry[2] Sequences Length
+    # ....newEntry[2] Sequences average Length
+    newEntry.append(infos[9])  #TODO or take the median : chiffre rond
 
     # ....newEntry[3] There is adaptator ?
     info=infos[19]
@@ -134,21 +142,18 @@ for line in range(1,len(lines)):
     else :
         newEntry.append(True)
 
-    # ....newEntry[4] There is overrepresented polyX nucleotide sequence ?
+    # ....newEntry[4] There is overrepresented sequence ?
     info=infos[18]
     if (info =="fail") or (info =="Fail") or (info =="FAIL") :
-        k # TODO Find where sequence are stocked and acces it to analyse them
-        newEntry.append("TODO")
+        newEntry.append(True)
     else :
         newEntry.append(False)
 
-    # ....newEntry[5] Quality in read position <28 ? Min in red ?
-    result=[]
-    #test. if F result length = 0, else result=[T,(position,meanQualValue,minQualValue),(position,meanQualValue,minQualValue)]
+  
 
     info =infos[14]
-    # ....newEntry[6] There is WARN in Per base sequence Content ?
-    # ....newEntry[7] There is FAIL in Per base sequence Content ?
+    # ....newEntry[5] There is WARN in Per base sequence Content ?
+    # ....newEntry[6] There is FAIL in Per base sequence Content ?
     newEntryFdata=[]
     newEntryWdata=[]
     if (info =="pass") or (info =="Pass") or (info =="PASS") :
@@ -161,6 +166,7 @@ for line in range(1,len(lines)):
             #Analyse only Warn to add list of warned pos in read
         else : 
             newEntryFdata.append(True)
+            newEntryWdata.append("Not evaluated")
             #Analyse Warn and Fail 
             # Add list of failed pos in read
             #Set newEntryWdata T or F with pos len (0 is F)
@@ -168,21 +174,37 @@ for line in range(1,len(lines)):
     newEntry.append(newEntryWdata)
     newEntry.append(newEntryFdata)
 
-
-        
-
-# ....newEntry[8] RNA Type
-# ....newEntry[9] fastP options
-# (or put after file close and tab make)
-
-
-
+    # .... Put the new entry on the tab
+    totSample.append[newEntry]
 
 file.close()
 
+# .. Open others files to complete the analyse 
+    for sample in range (len(totSample)) :
+
+        # .... Adding bad quality in read - Entry[7] & Entry[8]
+
+        # Position(s) with median number of read < 28 - [True , (pos, pos, pos)] OR [False , ()]
+        #TODO or #test. if F result length = 0, else result=[T,(position,meanQualValue,minQualValue),(position,meanQualValue,minQualValue)]   
+        median=[]
+        # Position(s) with minimal quality of read < 10 - [True , (pos, pos, pos)] OR [False , ()]
+        minimal=[]
 
 
-# To gain space idea : write tabs pairedSample and singleSample on a csv file (For user permit to keep trimming option if is useful)
+    
+
+# ....Entry[9] RNA Type
+# ....Entry[10] fastP options
+# (or put after file close and tab make)
+# --> in that case
+# + if overrepresented sequence in data where minlenght >100 bp : see if polyX nuceotidique sequence --> open fastqc zipped dir and read the info OR read on multiqc meta data
+# + if true qual at pos < 28 : see if some read on sample with bas qual < 28 OR red limit --> open fastqc zipped dir and read the info OR read on multiqc meta data
+#           : at the end juste -3 -5 ok, if in read peak ou si après trimming put quality treshord to red limit and % of base not on trheshold to 0
+
+
+
+
+# To gain space idea : write tabs on a csv file (For user permit to keep trimming option if is useful)
 # Can do after two tabs completed or after each column 
 
 
