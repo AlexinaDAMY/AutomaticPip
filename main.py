@@ -1,5 +1,9 @@
 # Use it : give in argument one txt file with the accession ID / or a csv file + path where put output + analyse name(without space or special charactère)
 
+#BALISE # PATHDEF where a define path
+#==> see them when ai write this script to be used by nextflow or on cluster
+
+
 # ---- Import
 
 import os
@@ -8,7 +12,7 @@ import sys
 # ---- Set path
 
 #inputFile=sys.argv[1] #Used at the final version
-inputdir="/home/smile/Bureau/TestautoPip/ManonData"
+inputdir="/home/smile/Bureau/TestautoPip/ManonData" # PATHDEF
 outdir=sys.argv[2]
 
 #To suppres to didn't keep file generated that user don't want
@@ -17,6 +21,8 @@ tmpdir=currentdir+'/work'
 #TODO suppress tmpdir content (generated in the previous run) VOIR COMMENT ENV INTERACTIF DE CODIUM GERE
 
 # ---- Other variables
+
+#Construct files path here
 
 
 ############################
@@ -33,14 +39,15 @@ tmpdir=currentdir+'/work'
 ############################
 
 #TEMP
-multiqcPath=inputdir+"/multiqc_fastqc.txt"
-file=open(multiqcPath,"r")
-givedAcc=(file.read()).split("\n")
+multiqcPath=inputdir+"/multiqc_fastqc.txt" # PATHDEF
+sampleList='' #TODO make the file with alla accession, put the good path here and define givedAcc wi
+file=open(sampleList,"r")
+givedAcc=(file.read()).split("\n") # PATHDEF
 file.close()
 givedAcc.sort()
 totAccNumber=len(givedAcc)
 
-print(givedAcc[0]) #TEMP
+print("\n\n ----- SAMPLE ANALYZED --------\n",givedAcc[0]) #TEMP
 
 ############################
 # Perform the first QC
@@ -53,11 +60,15 @@ print(givedAcc[0]) #TEMP
 # ---- Paired=true ?
 
 # LINK LIST ON LINKED_FILES REPERTORY
+#TODO suppr when work : now files in fastq.zip directory
+#TODO
 dataFiles=[]
 
 # Files names construct with the accession ID
 paired=[]
 single=""
+
+# TODO comparer len acc id in file + len fastqc_zip listing
 
 for acc in range(totAccNumber) :
     
@@ -102,8 +113,8 @@ for acc in range(totAccNumber) :
 #If run CQ always from the same CQ directory
 # WARNING : my CQ not generate plot data text file --> multiQC -p option
 # But multiqc_fastqc.txt is generated all times and contains general information for each sample
-filePath=outdir+"/results/multiqc/multiqc_data/multiqc_fastqc.txt"
-file=open(filePath,"r")
+
+file=open(multiqcPath,"r")                               # PATHDEF
 lines=(file.read()).split("\n")
 
 # .. Check the header : read correctly data
@@ -120,6 +131,12 @@ if header!=multiqcNormalHeader :
 # Tab with multiQC output analyse 
 totSample=[]
 
+#TODO ++++++++
+# to delete aftre debug
+subprocess.run(["touch","\'LastAnalyseRes.txt\'"])
+outputFile=currentdir+'/LastAnalyseRes.txt'              #PATH
+output=open(outputFile,'w')
+#++++++++++
 
 for line in range(1,len(lines)): 
     infos=(lines[line]).split("\t")
@@ -177,21 +194,42 @@ for line in range(1,len(lines)):
     # .... Put the new entry on the tab
     totSample.append[newEntry]
 
+    #Todo sup ap debug
+    sauv=''
+    for element in newEntry :
+        sauv=sauv+'\t'+element
+
+    .write()
+
 file.close()
+output.close()
+
+
+# --------------------------------------------------------------------------
 
 # .. Open others files to complete the analyse 
-    for sample in range (len(totSample)) :
+for sample in range (len(totSample)) :
 
-        # .... Adding bad quality in read - Entry[7] & Entry[8]
+    fastqc_zip=inputdir+'/fastqc_zip' #Todo path to modify when automatize thz pipeline # PATHDEF
+    fastqc_zip_dir=fastqc_zip+'/'+totSample[sample][0]+'_fastqc.zip'
+    subprocess.run(["unzip",fastqc_zip_dir])
 
-        # Position(s) with median number of read < 28 - [True , (pos, pos, pos)] OR [False , ()]
-        #TODO or #test. if F result length = 0, else result=[T,(position,meanQualValue,minQualValue),(position,meanQualValue,minQualValue)]   
-        median=[]
-        # Position(s) with minimal quality of read < 10 - [True , (pos, pos, pos)] OR [False , ()]
-        minimal=[]
+    # .. OPEN 
+    fastqc_zip_file = fastqc_zip+'/'+totSample[sample][0]+'_fastqc'+'/fastqc_data.txt'
+    file=open(fastqc_zip_file,'r')
 
 
-    
+
+    # .... Adding bad quality in read - Entry[7] & Entry[8]
+
+    # Position(s) with median number of read < 28 - [True , (pos, pos, pos)] OR [False , ()]
+    #TODO or #test. if F result length = 0, else result=[T,(position,meanQualValue,minQualValue),(position,meanQualValue,minQualValue)]   
+    median=[]
+    # Position(s) with minimal quality of read < 10 - [True , (pos, pos, pos)] OR [False , ()]
+    minimal=[]
+
+
+    file.close()
 
 # ....Entry[9] RNA Type
 # ....Entry[10] fastP options
@@ -202,9 +240,11 @@ file.close()
 #           : at the end juste -3 -5 ok, if in read peak ou si après trimming put quality treshord to red limit and % of base not on trheshold to 0
 
 
+    dirToSup=fastqc_zip+'/'+totSample[sample][0]+'_fastqc' # PATH
+    subprocess.run(["rm","-r","-i",dirToSup])
 
 
-# To gain space idea : write tabs on a csv file (For user permit to keep trimming option if is useful)
+# To gain space idea : write tabs on a csv/txt file (For user permit to keep trimming option if is useful)
 # Can do after two tabs completed or after each column 
 
 
