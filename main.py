@@ -9,6 +9,7 @@
 import os
 import sys
 import subprocess
+import csv
 
 # ---- Set path
 
@@ -19,7 +20,8 @@ outdir="/home/smile/Bureau/TestautoPip/ManonData-PRJNA371"
 
 #To suppres to didn't keep file generated that user don't want
 #subprocess.run(["pwd"], output=True) #Todo
-#currentdir= 'Command permit to have pwd result'
+#currentdir= 'Command permit to have pwd result' #TODO
+currentdir='/home/smile/Bureau/autoPip/'
 tmpdir=outdir+'/working'
 #TODO suppress tmpdir content (generated in the previous run) VOIR COMMENT ENV INTERACTIF DE CODIUM GERE
 
@@ -385,24 +387,48 @@ for sample in range (0,(len(totSample))) :
     subprocess.run(["rm","-r",dirToSup])
 
 
-#TODO ++++++++
-# to delete aftre debug
-
-outputFile=outdir+'/LastAnalyseRes.txt'              #PATH
-output=open(outputFile,'w')
-output.write('')
-#Header
-output.write('Sample\tTotal Seq\tMean Length\tAdaptor\tOverrepresented Seq\tPerBaseSeqContent WARN (multiqc,fastqc,pos)\tPerBaseSeqContent FAIL(multiqc,fastqc,pos)\tMedQualLow28\tMinQualLow20\tMinQualLow10\tDupplicated\n')
-
-for element in totSample :
-    output.write(str(element))
-    output.write('\t')
-    output.write('\n')
-
-output.close
-#++++++++++
-
 # ....Entry[11] RNA Type
+
+# List of csv file the contain the AccID for each type of RNA
+listType=['transcriptomic_circRNAAccession.csv','transcriptomic_lncRNAAccession.csv','transcriptomic_RandomRNAAccession.csv','transcriptomic_SMRTAccession.csv','transcriptomic_sRNAAccession.csv','transcriptomic_totalAccession.csv']
+accType=[]
+
+for listedCSV in listType :
+    createdList=[]
+    #.. Define the first element of this list
+    split1=listedCSV.split('_')
+    split2=(split1[1]).split('Accession')
+    type=split2[0]
+    createdList.append(type)
+
+    #.. Fill the list
+    path=currentdir+listedCSV
+    with open(path, mode='r') as csvFile :
+        file=csv.reader(csvFile, delimiter=',')
+        for row in file :
+            createdList.append(row)
+    accType.append(createdList)
+
+
+for sample in range(len(totSample)) :
+
+    totSample[sample].append('Not set')
+    for type in range(len(accType)) :
+        if totSample[sample][0] in accType[type] :
+            totSample[sample][11]=accType[type][0]
+    
+    if totSample[sample][11]=='Not set':
+        totSample[sample][11]='mRNA'
+
+    #TODO how evaluated if random RNA is mRNA or sRNA ???? Or other
+    if totSample[sample][11]=='RandomRNA':
+        print('\n\nSome RANDOM RNA have been found !!!!! \n\n')
+
+############################
+# Define the fastP options
+############################
+
+
 # ....Entry[12] fastP options
 # (or put after file close and tab make)
 # --> in that case
@@ -415,6 +441,37 @@ output.close
 # To gain space idea : write tabs on a csv/txt file (For user permit to keep trimming option if is useful)
 # Can do after two tabs completed or after each column 
 
+
+############################
+# Output file fill
+############################
+
+
+#TODO ++++++++
+# to delete aftre debug
+
+outputFile=outdir+'/LastAnalyseRes.txt'              #PATH
+output=open(outputFile,'w')
+output.write('')
+#Header
+outputHeader='Sample\tTotal Seq\tMean Length\tAdaptor\tOverrepresented Seq\tPerBaseSeqContent WARN (multiqc,fastqc,pos)\tPerBaseSeqContent FAIL(multiqc,fastqc,pos)\tMedQualLow28\tMinQualLow20\tMinQualLow10\tDupplicated\tRNAtype\n'
+output.write(outputHeader)
+
+for element in totSample :
+    output.write(str(element))
+    output.write('\t')
+    output.write('\n')
+
+output.close
+#++++++++++
+
+
+
+print('\n\n********* LastAnalyseRes Header ***********\n\n')
+resHeader=outputHeader.split('\t')
+for element in range(0,(len(resHeader))):
+    print(element,'\t',resHeader[element])
+print('**************************************\n\n')
 
 
 ############################
@@ -440,4 +497,3 @@ output.close
 ############################
 
 
-print('Hello world')
