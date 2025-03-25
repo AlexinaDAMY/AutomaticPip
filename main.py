@@ -86,7 +86,6 @@ for acc in range(totAccNumber-1) : #-1 because a \n symbol at the end of the lis
     paired=[pairedFile]
     pairedFile=givedAcc[acc]+"_2"+".fastqc.gz"
     paired.append(pairedFile)
-    #print(paired) #TEMP
     if (paired[0] in dataFiles) and (paired[1] in dataFiles):
         single=givedAcc[acc]+".fastqc.gz"
         # .... If it's case you must have only two file for the accession ID
@@ -101,7 +100,6 @@ for acc in range(totAccNumber-1) : #-1 because a \n symbol at the end of the lis
         # .... Other tested cases files contains : 0 paired (p) + 0 single (s), 0p+1s, 1p+0s, 1p+1s
     else :
         single=givedAcc[acc]+".fastqc.gz"
-        #print('\n------ SINGLE read file value : ',single,'-------\n') #debug
         if single in dataFiles:
             if (paired[0] in dataFiles) or (paired[1] in dataFiles):
                 print("The database seems contain one fastq file for paired reads data AND one fastq file for single reads [ACCESSION : "+givedAcc[acc]+"]. Please manually check if paired or single reads and put the right data files.")
@@ -131,10 +129,10 @@ lines=(file.read()).split("\n")
 header=(lines[0]).split("\t")
 multiqcNormalHeader=['Sample', 'Filename', 'File type', 'Encoding', 'Total Sequences', 'Sequences flagged as poor quality', 'Sequence length', '%GC', 'total_deduplicated_percentage', 'avg_sequence_length', 'basic_statistics', 'per_base_sequence_quality', 'per_sequence_quality_scores', 'per_base_sequence_content', 'per_sequence_gc_content', 'per_base_n_content', 'sequence_length_distribution', 'sequence_duplication_levels', 'overrepresented_sequences', 'adapter_content']
 #TODO to delete
-print('\n\n********* multiqcHeader ***********\n\n')
-for element in range(0,(len(multiqcNormalHeader))):
-    print(element,'\t',multiqcNormalHeader[element])
-print('**************************************\n\n')
+#print('\n\n********* multiqcHeader ***********\n\n')
+#for element in range(0,(len(multiqcNormalHeader))):
+    #print(element,'\t',multiqcNormalHeader[element])
+#print('**************************************\n\n')
 
 if header!=multiqcNormalHeader :
     print("MultiQC report file doesn't seem like expected !\nExpected header : "+multiqcNormalHeader)
@@ -151,10 +149,8 @@ totSample=[]
 
 for line in range(1,len(lines)): 
     infos=(lines[line]).split("\t")
-    #print('----- ', infos)
 
     if infos != [''] :
-        #print('\n\n+++++++++ Ligne multiqc analysée :\n\n',infos)
 
         newEntry=[]
 
@@ -212,24 +208,15 @@ for line in range(1,len(lines)):
 
 file.close()
 
-#for sample in totSample :  #TODO to delete
-    #print(sample)
-
 
 # --------------------------------------------------------------------------
 
 # .. Open others files to complete the analyse 
-#TODO delete print('NB SAMPLE : ', len(totSample))
 for sample in range (0,(len(totSample))) :
-
-    #print('\nun tour de boucle')
-    #print(sample,'\t',totSample[sample])  #TODO to delete
 
     fastqc_zip=inputdir+'/fastqc_zip' #Todo path to modify when automatize thz pipeline # PATHDEF
     fastqc_zip_dir=fastqc_zip+'/'+totSample[sample][0]+'_fastqc.zip'
     subprocess.run(["unzip","-q",fastqc_zip_dir,"-d",tmpdir])
-
-    #TODO delete print('---- Unzipe ',fastqc_zip_dir)
 
     # .. OPEN 
     fastqc_zip_file = tmpdir+'/'+totSample[sample][0]+'_fastqc'+'/fastqc_data.txt'
@@ -337,8 +324,6 @@ for sample in range (0,(len(totSample))) :
     W=False #The evaluated level during analyses
     F=False
 
-    print('\n\n"""""""""" ',totSample[sample][0],' MULTIQC results : ',Wcontent,' - ',Fcontent)
-
     if (Wcontent[0]==True) or (Wcontent[0]=="Not evaluated") :   
 
         fastqcPart=(fastqcInfo[6].split('>'))[0]
@@ -351,11 +336,6 @@ for sample in range (0,(len(totSample))) :
             diffAT=values[1]-values[0]
             values=sorted([float(line[1]),float(line[4])])
             diffGC=values[1]-values[0]
-
-            #print(diffAT,' - ',diffGC)#TODO to delete
-
-            #print('------ Position analyzed : ', line[0]) #TODO to delete
-            #print(line,'\n',len(line),'\n')
 
             if (diffAT>10) or (diffGC>10) :
         
@@ -377,18 +357,11 @@ for sample in range (0,(len(totSample))) :
            
                         
                         
-
-    print('++++++++ Warning Level construction \n',totSample[sample][5]) #TODO to delete
     totSample[sample][5].append(W)
-    print(totSample[sample][5])  #TODO to delete
     totSample[sample][5].append(posW)  
-    print(totSample[sample][5]) #TODO to delete
 
-    print('++++++++ Fail Level construction \n',totSample[sample][6]) #TODO to delete
     totSample[sample][6].append(F)
-    print(totSample[sample][6])  #TODO to delete
     totSample[sample][6].append(posF)
-    print(totSample[sample][6])  #TODO to delete
 
     # .... Adding dupplication analyse - Entry[10]
 
@@ -465,3 +438,6 @@ output.close
 ############################
 # Performe mapping
 ############################
+
+
+print('Hello world')
