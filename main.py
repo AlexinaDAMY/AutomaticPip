@@ -132,6 +132,7 @@ header=(lines[0]).split("\t")
 multiqcNormalHeader=['Sample', 'Filename', 'File type', 'Encoding', 'Total Sequences', 'Sequences flagged as poor quality', 'Sequence length', '%GC', 'total_deduplicated_percentage', 'avg_sequence_length', 'basic_statistics', 'per_base_sequence_quality', 'per_sequence_quality_scores', 'per_base_sequence_content', 'per_sequence_gc_content', 'per_base_n_content', 'sequence_length_distribution', 'sequence_duplication_levels', 'overrepresented_sequences', 'adapter_content']
 
 #TODO to delete
+# TAB EXPLAINED : multiQC content
 #print('\n\n********* multiqcHeader ***********\n\n')
 #for element in range(0,(len(multiqcNormalHeader))):
 #    print(element,'\t',multiqcNormalHeader[element])
@@ -461,7 +462,6 @@ for sample in range(len(totSample)) :
 # + if true qual at pos < 28 : see if some read on sample with bas qual < 28 OR red limit --> open fastqc zipped dir and read the info OR read on multiqc meta data
 #           : at the end juste -3 -5 ok, if in read peak ou si après trimming put quality treshord to red limit and % of base not on trheshold to 0
 
-fastp=[]
 undedupp=[]
 trashed=[]
 
@@ -508,45 +508,27 @@ for sample in range(len(totSample)) :
                 opt=opt+' --detect_adapter_for_pe'
 
         length=round(totSample[sample][2])
-
-        #.... Did i put the -y option ? #TODO define for the other type of RNA
-        diversityOption=False
-        if length<=100 :
-            diversityOption=True
-        else :
-            if totSample[sample][4][1]==True : #TOOD if i keep maybe, change here with != false
-                opt=opt+' -y'
-        if diversityOption==True:
-            opt=opt+' -y'
         
         #.... Did I cut reads front ? #TODO define for the other type of RNA
         cutInOpt=0
-        print(totSample[sample][5][1])
-        print(totSample[sample][6][1])
         if (totSample[sample][11]=='mRNA') and ( (totSample[sample][5][0]==True) or (totSample[sample][6][0]==True) ):
-            print('jentre in boucle 1')
             if (totSample[sample][5][0]==True) and (totSample[sample][6][0]==True):
-                print('suis in boucle2')
-                #pos=totSample[sample][5][1].extend(totSample[sample][6][1])
+                #pos=totSample[sample][5][1].extend(totSample[sample][6][1]) #Notwork
                 pos=totSample[sample][5][1]
                 for value in totSample[sample][6][1]:
                     pos.append(value)
-                print('######### ',pos)
             else :
                 if totSample[sample][5][0]==True :
                     pos=totSample[sample][5][1]
                 if totSample[sample][6][0]==True :
                     pos=totSample[sample][6][1]
                 # Trim pos to keep them < 25 (read begin)
-            begPos=[]
+            position=0
             for value in pos :
-                print('------ ',value)
                 if value < 26:
-                    begPos.append(int(value))
-            print(begPos[-1])
-            begPos=begPos.sort()
-            print(begPos)
-            cutInOpt=int(begPos[-1])+1 # We must indicate to fastp the first nucleotide to didn't trimm
+                    if value >position:
+                        position=value
+            cutInOpt=position+1 # We must indicate to fastp the first nucleotide to didn't trimm
             add=' -f '+str(cutInOpt)
             opt=opt+add
         # if totSample[sample][11]=='sRNA':, do nothing for that opt
@@ -558,9 +540,11 @@ for sample in range(len(totSample)) :
 
         #.... set the minimal (and maximal for sRNA) lenght of trimmed reads (default : 15) #TODO define for the other type of RNA
         if totSample[sample][11]=='mRNA':
-            percentage=((length-int(begPos[-1]))*0.6)/150
-            finalLength=int(percentage*(length-int(begPos[-1])))
-            print('Final length : ',percentage,' * (',length,' - ',int(BegPos[-1]),')') #TODO delete after debugg
+            percentage=((length-position)*0.6)/150
+            finalLength=int(percentage*(length-position))
+            #print('Final length : ',percentage,' * (',length,' - ',position,') = ',finalLength) #TODO delete after debugg
+            added=' -l '+str(finalLength)
+            opt=opt+added
 
         if totSample[sample][11]=='sRNA':
             if totSample[sample][6][0]==True:
@@ -581,9 +565,19 @@ for sample in range(len(totSample)) :
                     added=' -l 18 -b '+str(cutUpperPos)
                     opt=opt+added
 
-    if sampleTrash==False :        
+    if sampleTrash==False :  
 
-
+        #.... Did i put the -y option ? #TODO define for the other type of RNA
+        diversityOption=False
+        if length<=100 :
+            diversityOption=True
+        else :
+            print('/////////////// ',totSample[sample][4])
+            if totSample[sample][4][1]==True : #TOOD if i keep maybe, change here with != false
+                opt=opt+' -y'
+        if diversityOption==True:
+            opt=opt+' -y'
+      
         #.... Now just print sample with 90th lower percentile < 10 for quality, after treat them with position (change percentage of base authorized with quality < treshold (warning threshold))
         # And after see if I can refine the window size for read quality # TODO TODO
     
@@ -595,9 +589,11 @@ for sample in range(len(totSample)) :
             print('Position with 90th Lower Percentile quality <10 : ', totSample[sample][9][1])
             print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n')
 
-        newEntry.append(totSample[sample][0])
-        newEntry.append(opt)
-        fastp.append(newEntry)
+ 
+
+
+    totSample[sample].append(opt)
+
 
 
 print('\n-----------  SAMPLE(s) TRASHED FOR ANY REASON  ------')
@@ -617,7 +613,7 @@ outputFile=outdir+'/LastAnalyseRes.txt'              #PATH
 output=open(outputFile,'w')
 output.write('')
 #Header
-outputHeader='Sample\tTotal Seq\tMean Length\tAdaptor\tOverrepresented Seq\tPerBaseSeqContent WARN (multiqc,fastqc,pos)\tPerBaseSeqContent FAIL(multiqc,fastqc,pos)\tMedQualLow28\tMinQualLow20\tMinQualLow10\tDupplicated\tRNAtype\tSingleOrPairedRead\tfastPoptions\n'
+outputHeader='Sample\tTotal Seq\tMean Length\tAdaptor\tOverrepresentedSeq/polyXSeq\tPerBaseSeqContent WARN (T/F,pos)\tPerBaseSeqContent FAIL\tMedQualLow28\tMinQualLow20\tMinQualLow10\tDupplicated(level,percentageNotDuplicated)\tRNAtype\tSingleOrPairedRead\tfastPoptions\n'
 output.write(outputHeader)
 
 for element in totSample :
@@ -633,8 +629,8 @@ outputFile=outdir+'/FastoOpt.txt'              #PATH
 output=open(outputFile,'w')
 output.write('')
 
-for element in fastp :
-    entry=element[0]+'\t'+element[1]
+for element in totSample :
+    entry=element[0]+'\t'+element[-1]
     output.write(entry)
     output.write('\n')
 
@@ -643,19 +639,24 @@ output.close
 #++++++++++
 
 
-
-print('\n\n********* LastAnalyseRes Header ***********\n\n')
-resHeader=outputHeader.split('\t')
-for element in range(0,(len(resHeader))):
-    print(element,'\t',resHeader[element])
-print('**************************************\n\n')
+# TAB EXPLAINED : totSample
+#print('\n\n********* LastAnalyseRes Header ***********\n\n')
+#resHeader=outputHeader.split('\t')
+#for element in range(0,(len(resHeader))):
+    #print(element,'\t',resHeader[element])
+#print('**************************************\n\n')
 
 
 ############################
 # Make the trimming sub data set
 ############################
 
-# Read the csv if I do one
+# TAB EXPLAINED : totSample
+#print('\n\n********* LastAnalyseRes Header ***********\n\n')
+#resHeader=outputHeader.split('\t')
+#for element in range(0,(len(resHeader))):
+    #print(element,'\t',resHeader[element])
+#print('**************************************\n\n')
 
 ############################
 # Performe the trimming
