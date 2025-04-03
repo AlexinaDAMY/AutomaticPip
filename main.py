@@ -570,7 +570,7 @@ for sample in range(len(totSample)) :
         #.... Did i put the -y option ? #TODO define for the other type of RNA
         diversityOption=False
         if length<=100 :
-            diversityOption=True
+            diversityOption=True  #TODO TODO for length<100, change the % of minimal diversity according with length / change maximal authorized number of position with quality bad
         else :
             print('/////////////// ',totSample[sample][4])
             if totSample[sample][4][1]==True : #TOOD if i keep maybe, change here with != false
@@ -639,24 +639,84 @@ output.close
 #++++++++++
 
 
-# TAB EXPLAINED : totSample
-#print('\n\n********* LastAnalyseRes Header ***********\n\n')
-#resHeader=outputHeader.split('\t')
-#for element in range(0,(len(resHeader))):
-    #print(element,'\t',resHeader[element])
-#print('**************************************\n\n')
+#TAB EXPLAINED : totSample
+print('\n\n********* LastAnalyseRes Header ***********\n\n')
+resHeader=outputHeader.split('\t')
+for element in range(0,(len(resHeader))):
+    print(element,'\t',resHeader[element])
+print('**************************************\n\n')
 
 
 ############################
 # Make the trimming sub data set
 ############################
 
-# TAB EXPLAINED : totSample
-#print('\n\n********* LastAnalyseRes Header ***********\n\n')
-#resHeader=outputHeader.split('\t')
-#for element in range(0,(len(resHeader))):
-    #print(element,'\t',resHeader[element])
-#print('**************************************\n\n')
+## .. Do paired reads opt the same for pair of reads are on the same dataset at the end
+# TODO TODO
+
+for sample in range(len(totSample)-1)
+
+    if '_1' in totSample[sample][0]:
+        optR1=(totSample[sample][13]).split(" ")
+        optR2=(totSample[sample+1][13]).split(" ")
+
+
+
+
+
+# TAB EXPLAINED : rst tab
+print('\n\n********* dataset table index ***********\n\n')
+index='DatasetX (with X the ID of dataset)\tPipeline paired option (if \'paired : 1\', reads are paired)\tfastp options\tList of sample in this dataset'
+resIndex=index.split('\t')
+for element in range(0,(len(resIndex))):
+    print(element,'\t',resIndex[element])
+print('**************************************\n\n')
+
+
+datasetID=1
+rst=[] #See above
+sampledst=''
+# Variable to link fastp option already found with corresponding dataset ID
+# [ [dataset1, opt] , [dataset2, opt] ]  --> Have matched indice
+# OR
+# **** [dataset1, dataset2]  [opt1, opt2] with dataset and opt adding in the same  order --> Have matched indice
+# OR
+# [opt1, opt2]   [ [dataset1, opt] , [dataset2, opt] ]
+opt=[]
+dtset=[]
+
+for sample in range(0,len(totSample)-1):
+
+    # .. Give the dataset name to the sample
+
+    if len(opt)==0:
+        # Update existing dst
+        opt.append(totSample[sample][13])
+        dtset.append('dataset'+str(datasetID))
+
+        #Save sample dst info
+        sampledst='dataset'+str(datasetID)
+        datasetID=datasetID+1
+
+    else:
+        #Search if sample opyt in opt tab with opt.index(sampleOPT) --> treat the result, see what founction return if not find (if error, use if opsample in opt before)
+        if totSample[sample][13] in opt :
+            datasetID=dtset[(opt.index(totSample[sample][13]))]
+            print(totSample[sample][13],' --> ',datasetID)
+        else :
+            opt.append(totSample[sample][13])
+            dtset.append('dataset'+str(datasetID))
+            sampledst='dataset'+str(datasetID)
+            datasetID=datasetID+1
+
+    ## .. Put sample on rst tab
+
+    #search if there is dst sample in rst tab
+    #--> yes : juste pu sample name on rst[3] list
+    #--> no : create a new dst entry un rst with sample name on rst[3]
+
+    ## .. For each dataset, split single ans paired reads
+
 
 ############################
 # Performe the trimming
