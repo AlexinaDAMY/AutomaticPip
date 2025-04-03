@@ -10,6 +10,7 @@ import os
 import sys
 import subprocess
 import csv
+import statistics
 
 # ---- Set path
 
@@ -161,23 +162,27 @@ for line in range(1,len(lines)):
         # ....newEntry[0] Read sample name
         newEntry.append(infos[0])
 
-        # ....newEntry[1] Total sequences count
+        # ....newEntry[1] Technology used for sequencing
+        newEntry.append(infos[3])
+        print('[[[[[[[[[[[[[[[[[[[[[               ',infos[3],'                ]]]]]]]]]]]]]]]]]]]]]')
+
+        # ....newEntry[2] Total sequences count
         newEntry.append(float(infos[4]))
 
-        # ....newEntry[2] Sequences average Length
+        # ....newEntry[3] Sequences average Length
         newEntry.append(float(infos[9]))
 
-        # ....newEntry[3] There is adaptator ?
+        # ....newEntry[4] There is adaptator ?
         info=infos[19]
         if (info =="pass") or (info =="Pass") or (info =="PASS") :
             newEntry.append(False)
         else :
             newEntry.append(True)
 
-        # ....newEntry[4] There is overrepresented sequence ? [T/F, PolyX seq overrepresented]
+        # ....newEntry[5] There is overrepresented sequence ? [T/F, PolyX seq overrepresented]
         info=infos[18]
         added=[]
-        if (info =="fail") or (info =="Fail") or (info =="FAIL") :
+        if (info !="pass") and (info !="Pass") and (info !="PASS") :  #TODO TODO Improve my script : always lower case ? il it's case not need all tests in if condition and all other in the script
             added.append(True)
         else :
             added.append(False)
@@ -186,8 +191,8 @@ for line in range(1,len(lines)):
   
 
         info =infos[13]
-        # ....newEntry[5] There is WARN in Per base sequence Content ?
-        # ....newEntry[6] There is FAIL in Per base sequence Content ?
+        # ....newEntry[6] There is WARN in Per base sequence Content ?
+        # ....newEntry[7] There is FAIL in Per base sequence Content ?
         newEntryFdata=[]
         newEntryWdata=[]
         if (info =="pass") or (info =="Pass") or (info =="PASS") :
@@ -231,7 +236,7 @@ for sample in range (0,(len(totSample))) :
 
     fastqcInfo=(file.read()).split('#')
 
-    # .... Adding bad quality in read - Entry[7] & Entry[8]  & Entry[9]
+    # .... Adding bad quality in read - Entry[8] & Entry[9]  & Entry[10]
 
     #TODO or #test. if F result length = 0, else result=[T,(position,meanQualValue,minQualValue),(position,meanQualValue,minQualValue)]   
     fastqcPart=fastqcInfo[4]
@@ -370,28 +375,7 @@ for sample in range (0,(len(totSample))) :
     totSample[sample][6]=F
     totSample[sample][6].append(posF)
 
-    # .... Adding dupplication analyse - Entry[10]
-
-    fastqcPart=(fastqcInfo[9]).split('>')
-    fastqcReaded=(fastqcPart[-1]).split('\t')
-    # Pass, Warn or Fail level
-    duplLevel=(fastqcReaded[-1].split('\n'))[0]
-
-    fastqcPart=fastqcInfo[10]
-    fastqcReaded=(fastqcPart.split('\t'))
-    # Percentage of sequence of total sequence if we dedupplicated them
-    percentageDedup=float((fastqcReaded[-1].split('\n'))[0])
-
-    newEntry=[duplLevel,percentageDedup]
-    totSample[sample].append(newEntry)
-
-    file.close()
-
-    #dirToSup=fastqc_zip+'/'+totSample[sample][0]+'_fastqc' # PATH
-    dirToSup=tmpdir+'/'+totSample[sample][0]+'_fastqc'
-    subprocess.run(["rm","-r",dirToSup])
-
-    # .... Adding polyX seq in overrepresented - Entry[4][1] 
+    # .... Adding polyX seq in overrepresented - Entry[5][1] 
 
     polyX=False
     if totSample[sample][4][0]==True:
@@ -412,6 +396,12 @@ for sample in range (0,(len(totSample))) :
     totSample[sample][4].append(polyX)
 
 
+
+    file.close()
+
+    #dirToSup=fastqc_zip+'/'+totSample[sample][0]+'_fastqc' # PATH
+    dirToSup=tmpdir+'/'+totSample[sample][0]+'_fastqc'
+    subprocess.run(["rm","-r",dirToSup])
 
 # ....Entry[11] RNA Type
 
@@ -451,7 +441,7 @@ for sample in range(len(totSample)) :
         print('\n\nSome RANDOM RNA have been found !!!!! \n\n')
 
 ############################
-# Define the fastP options
+# Define the fastP options                    #TODO TODO TODO base op add -n ==> see how fastP do by default
 ############################
 
 
@@ -461,7 +451,7 @@ for sample in range(len(totSample)) :
 # + if overrepresented sequence in data where minlenght >100 bp : see if polyX nuceotidique sequence --> open fastqc zipped dir and read the info OR read on multiqc meta data
 # + if true qual at pos < 28 : see if some read on sample with bas qual < 28 OR red limit --> open fastqc zipped dir and read the info OR read on multiqc meta data
 #           : at the end juste -3 -5 ok, if in read peak ou si après trimming put quality treshord to red limit and % of base not on trheshold to 0
-
+dfopt='-5 -3 -M 28 -D --n_base_limit 0'
 undedupp=[]
 trashed=[]
 
@@ -477,116 +467,92 @@ for sample in range(len(totSample)) :
     else :
         totSample[sample].append('single')
 
-    dfopt='-5 -3 -M 28'
     opt=dfopt
     
-    #.. Dedupplication and list all sample that can't be dedupplicated without poor sample number in analysis
-    undedupp=[]
 
-    if (totSample[sample][10][0]=='warn') or (totSample[sample][10][0]=='fail') :
-        afTrimRead=(float(totSample[sample][10][1])/100)*totSample[sample][1]
-        if totSample[sample][11]=='mRNA' :
-            if (afTrimRead<8000000) or (30000000<afTrimRead<45000000):
-                undedupp.append(totSample[sample][0])
-                undedupp.append(afTrimRead)
-                sampleTrash=True
-                trashed.append(totSample[sample][0])
-        if totSample[sample][11]=='sRNA' :
-            if (afTrimRead<900000) or (6000000<afTrimRead):
-                undedupp.append(totSample[sample][0])
-                undedupp.append(afTrimRead)
-                sampleTrash=True
-                trashed.append(totSample[sample][0])
-        #TODO define for the other type of RNA
-    
-    #.. If pass the dedupplication analyse
-    if sampleTrash==False :
+    #.... Did I put the --adapter-for-pe option ?
+    if totSample[sample][4]==True :
+        if totSample[12]=='paired' :
+            opt=opt+' --detect_adapter_for_pe'
 
-        #.... Did I put the --adapter-for-pe option ?
-        if totSample[sample][3]==True :
-            if totSample[12]=='paired' :
-                opt=opt+' --detect_adapter_for_pe'
-
-        length=round(totSample[sample][2])
+    length=round(totSample[sample][3])
         
-        #.... Did I cut reads front ? #TODO define for the other type of RNA
-        cutInOpt=0
-        if (totSample[sample][11]=='mRNA') and ( (totSample[sample][5][0]==True) or (totSample[sample][6][0]==True) ):
-            if (totSample[sample][5][0]==True) and (totSample[sample][6][0]==True):
-                #pos=totSample[sample][5][1].extend(totSample[sample][6][1]) #Notwork
-                pos=totSample[sample][5][1]
-                for value in totSample[sample][6][1]:
-                    pos.append(value)
-            else :
-                if totSample[sample][5][0]==True :
-                    pos=totSample[sample][5][1]
-                if totSample[sample][6][0]==True :
-                    pos=totSample[sample][6][1]
-                # Trim pos to keep them < 25 (read begin)
-            position=0
-            for value in pos :
-                if value < 26:
-                    if value >position:
-                        position=value
-            cutInOpt=position+1 # We must indicate to fastp the first nucleotide to didn't trimm
-            add=' -f '+str(cutInOpt)
-            opt=opt+add
-        # if totSample[sample][11]=='sRNA':, do nothing for that opt
-
-        #.... Dedupplicate
-        if totSample[sample][10][0]!='pass':
-            opt=opt+' -D'
-
-
-        #.... set the minimal (and maximal for sRNA) lenght of trimmed reads (default : 15) #TODO define for the other type of RNA
-        if totSample[sample][11]=='mRNA':
-            percentage=((length-position)*0.6)/150
-            finalLength=int(percentage*(length-position))
-            #print('Final length : ',percentage,' * (',length,' - ',position,') = ',finalLength) #TODO delete after debugg
-            added=' -l '+str(finalLength)
-            opt=opt+added
-
-        if totSample[sample][11]=='sRNA':
-            if totSample[sample][6][0]==True:
+    #.... Did I cut reads front ? #TODO define for the other type of RNA
+    cutInOpt=0
+    if (totSample[sample][11]=='mRNA') and ( (totSample[sample][6][0]==True) or (totSample[sample][7][0]==True) ):
+        if (totSample[sample][6][0]==True) and (totSample[sample][7][0]==True):
+            #pos=totSample[sample][5][1].extend(totSample[sample][6][1]) #Notwork
+            pos=totSample[sample][6][1]
+            for value in totSample[sample][7][1]:
+                pos.append(value)
+        else :
+            if totSample[sample][6][0]==True :
                 pos=totSample[sample][6][1]
-                # All position > 17 (default : -l 18)
-                trimmedPos=[]
-                for target in pos:
-                    # Value I expected don't have fail because normal RNA length
-                    if 17<target<=25 :
-                        sampleTrash=True
-                        print('\n\n Problem with sample ',totSample[sample][0],' fail on pos 17-25 on per base sequence content')
-                        trashed.append(totSample[sample][0])
-                    if 25<target :
-                        trimmedPos.append(target)
-                if sampleTrash==False:
-                    trimmedPos=trimmedPos.sort()
-                    cutUpperPos=trimmedPos[0]-1
-                    added=' -l 18 -b '+str(cutUpperPos)
-                    opt=opt+added
+            if totSample[sample][7][0]==True :
+                pos=totSample[sample][7][1]
+            # Keep greater value < 26 (read begin)
+        position=0
+        for value in pos :
+            if value < 26: 
+                if value >position:
+                    position=value
+        cutInOpt=position+1 # We must indicate to fastp the first nucleotide to didn't trimm
+        add=' -f '+str(cutInOpt)
+        opt=opt+add
+    # if totSample[sample][11]=='sRNA':, do nothing for that opt
 
+
+    #.... set the minimal (and maximal for sRNA) lenght of trimmed reads (default : 15) #TODO define for the other type of RNA
+    if totSample[sample][11]=='mRNA':
+        percentage=((length-position)*0.6)/150
+        finalLength=int(percentage*(length-position))
+        if finalLength<15: #15 is default setting
+            finalLength=15
+        added=' -l '+str(finalLength)
+        opt=opt+added
+
+    if totSample[sample][11]=='sRNA':
+        if totSample[sample][7][0]==True:
+            pos=totSample[sample][7][1]
+            # All position > 17 (default : -l 18)
+            trimmedPos=[]
+            for target in pos:
+                # Value I expected don't have fail because normal RNA length
+                if 17<target<=25 :
+                    sampleTrash=True
+                    print('\n\n Problem with sample ',totSample[sample][0],' fail on pos 17-25 on per base sequence content')
+                    trashed.append(totSample[sample][0])
+                if 25<target :
+                    trimmedPos.append(target)
+            if sampleTrash==False:
+                trimmedPos=trimmedPos.sort()
+                cutUpperPos=trimmedPos[0]-1
+                added=' -l 18 -b '+str(cutUpperPos)
+                opt=opt+added
+
+    #.. If pass the sRNA sequence content analyse (18-32 nt long un sRNA)
     if sampleTrash==False :  
 
-        #.... Did i put the -y option ? #TODO define for the other type of RNA
-        diversityOption=False
-        if length<=100 :
-            diversityOption=True  #TODO TODO for length<100, change the % of minimal diversity according with length / change maximal authorized number of position with quality bad
-        else :
-            print('/////////////// ',totSample[sample][4])
-            if totSample[sample][4][1]==True : #TOOD if i keep maybe, change here with != false
-                opt=opt+' -y'
-        if diversityOption==True:
-            opt=opt+' -y'
+        #.... Did i put the -y option ? #Don't do for now, see later
+        if length>100 :
+            opt=opt+' -y -Y 1'
+            #diversityOption=True  #TODO TODO for length<100, change the % of minimal diversity according with length / change maximal authorized number of position with quality bad
+        #else :
+            #print('/////////////// ',totSample[sample][4])
+            #if totSample[sample][5][1]==True : #TOOD if i keep maybe, change here with != false
+                #opt=opt+' -y'
+        #if diversityOption==True:
+            #opt=opt+' -y'
       
         #.... Now just print sample with 90th lower percentile < 10 for quality, after treat them with position (change percentage of base authorized with quality < treshold (warning threshold))
         # And after see if I can refine the window size for read quality # TODO TODO
     
-        if totSample[sample][9][0]==True :
+        if totSample[sample][10][0]==True :
             print('\n$$$$$$$$$$$$$$$$$ 90th lower percentile < 10 quality for sample '+totSample[sample][0]+' $$$$$$$$$$$$$$$$$')
             print('If result = [], this value is upper for all reads positions')
-            print('Position with Median quality <28 : ', totSample[sample][7][1])
-            print('Position with 90th Lower Percentile quality <20 : ', totSample[sample][8][1])
-            print('Position with 90th Lower Percentile quality <10 : ', totSample[sample][9][1])
+            print('Position with Median quality <28 : ', totSample[sample][8][1])
+            print('Position with 90th Lower Percentile quality <20 : ', totSample[sample][9][1])
+            print('Position with 90th Lower Percentile quality <10 : ', totSample[sample][10][1])
             print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n')
 
  
@@ -613,7 +579,7 @@ outputFile=outdir+'/LastAnalyseRes.txt'              #PATH
 output=open(outputFile,'w')
 output.write('')
 #Header
-outputHeader='Sample\tTotal Seq\tMean Length\tAdaptor\tOverrepresentedSeq/polyXSeq\tPerBaseSeqContent WARN (T/F,pos)\tPerBaseSeqContent FAIL\tMedQualLow28\tMinQualLow20\tMinQualLow10\tDupplicated(level,percentageNotDuplicated)\tRNAtype\tSingleOrPairedRead\tfastPoptions\n'
+outputHeader='Sample\tSequencing technology\tTotal Seq\tMean Length\tAdaptor\tOverrepresentedSeq/polyXSeq\tPerBaseSeqContent WARN (T/F,pos)\tPerBaseSeqContent FAIL\tMedQualLow28\tMinQualLow20\tMinQualLow10\tDupplicated(level,percentageNotDuplicated)\tRNAtype\tSingleOrPairedRead\tfastPoptions\n'
 output.write(outputHeader)
 
 for element in totSample :
@@ -652,13 +618,116 @@ print('**************************************\n\n')
 ############################
 
 ## .. Do paired reads opt the same for pair of reads are on the same dataset at the end
-# TODO TODO
 
 for sample in range(len(totSample)-1)
 
     if '_1' in totSample[sample][0]:
+        if totSample[sample][13] != totSample[sample+1][13]
         optR1=(totSample[sample][13]).split(" ")
         optR2=(totSample[sample+1][13]).split(" ")
+
+        print('~~~~~~~~~~ ONE AJUSTMENT MAKE : ',totSample[sample][0],totSample[sample][-2],totSample[sample][-1],' & ',totSample[sample+1][0],totSample[sample+1][-2],totSample[sample+1][-1])
+
+        finalopt=dfopt
+        maxInd=max(len(optR1),len(opt2))
+        R1f=''
+        R1l=''
+        R1b=''
+        R1y=''
+        R2=''
+        R2=''
+        R2=''
+        R2=''
+    # Compare values can be différent and decide the one to keep from each
+        for i in range(7,(maxInd-1),2):
+        #.. put values on the good variable
+            if optR1[i]=='-f':
+                R1f=int(optR1[i+1])
+            else :
+                if optR1[i]=='-l':
+                    R1l=int(optR1[i+1])
+                else:
+                    if optR1[i]=='-b':
+                        R1b=int(optR1[i+1])
+                    else:
+                        if optR1[i]=='-y':
+                            R1y=True
+                        else:
+                            print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : unknow option or fastp otion indice not set correctly') #TODO delete after debug
+
+            if optR2[i]=='-f':
+                R2f=int(optR2[i+1])
+            else :
+                if optR2[i]=='-l':
+                    R2l=int(optR2[i+1])
+                else:
+                    if optR2[i]=='-b':
+                        R2b=int(optR2[i+1])
+                    else:
+                        if optR2[i]=='-y':
+                            R2y=True
+                        else:
+                            print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : unknow option or fastp option indice not set correctly') #TODO delete after debug
+        
+        #.. compare each different options
+        nbDiff=0
+        optYadd=False
+
+        if R1f!='' or R2f!='':
+            if R1f==R2f:
+                finalopt=finalopt+' -f '+str(R1f)
+            if R1f!=R2f and R1f!='' and R2f!='':
+                nbDiff=nbDiff+1
+                finalopt=finalopt+' -f '+str(max(R1f,R2f))
+            else:
+                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -f OPT')
+                if R1f=='' :
+                    finalopt=finalopt+' -f '+str(R2f)
+                if R2f=='' :   # So case R1f==R2f with '' is not treat
+                    finalopt=finalopt+' -f '+str(R1f)
+
+
+        if R1l!='' or R2l!='':
+            if R1l==R2l:
+                finalopt=finalopt+' -l '+str(R1l)
+            if R1l!=R2l and R1l!='' and R2l!='':
+                nbDiff=nbDiff+1
+                finalopt=finalopt+' -l '+str(mean(R1l,R2l))
+            else:
+                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -l OPT')
+                if R1l=='' :
+                    finalopt=finalopt+' -l '+str(R2l)
+                if R2l=='' :  
+                    finalopt=finalopt+' -l '+str(R1f)
+
+
+        if R1b!='' or R2b!='':
+            if R1b==R2b:
+                finalopt=finalopt+' -b '+str(R1b)
+            if R1b!=R2b and R1b!='' and R2b!='':
+                nbDiff=nbDiff+1
+                finalopt=finalopt+' -b '+str(min(R1b,R2b))
+            else:
+                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -b OPT')
+                if R1b=='' :
+                    finalopt=finalopt+' -b '+str(R2b)
+                if R2b=='' :  
+                    finalopt=finalopt+' -b '+str(R1b)
+
+        if R1y!='' or R1y!='':
+            if R1y==R2y:
+                finalopt=finalopt+' -y -Y 1'
+            else:
+                finalopt=finalopt+' -y -Y 1'
+                optYadd=True
+                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : -y option différent btwenn this two sample (median length one <100 other >100)',totSample[sample][0],totSample[sample+1][0])
+
+
+
+        if nbDiff==0 and optYadd==False:
+            print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : I find différent fastP option bus after parse them not diff !!!', optR1,optR2)
+
+        print('final gived option : ', finalopt)
 
 
 
@@ -684,6 +753,7 @@ sampledst=''
 # [opt1, opt2]   [ [dataset1, opt] , [dataset2, opt] ]
 opt=[]
 dtset=[]
+dstP=[]
 
 for sample in range(0,len(totSample)-1):
 
@@ -693,29 +763,66 @@ for sample in range(0,len(totSample)-1):
         # Update existing dst
         opt.append(totSample[sample][13])
         dtset.append('dataset'+str(datasetID))
+        if '_' in totSample[sample][0]:
+            dstP.append(1)
+        else:
+            dstP.append(0)
 
         #Save sample dst info
         sampledst='dataset'+str(datasetID)
         datasetID=datasetID+1
 
+        #Init rst tab
+        Entry=[]
+        spList=[]
+        Entry.append(sampledst)
+        Entry.append(dstP[0])
+        spList.append(totSample[sample][0])
+        Entry.append(spList)
+        rst.append(Entry)
+
+
     else:
         #Search if sample opyt in opt tab with opt.index(sampleOPT) --> treat the result, see what founction return if not find (if error, use if opsample in opt before)
         if totSample[sample][13] in opt :
-            datasetID=dtset[(opt.index(totSample[sample][13]))]
-            print(totSample[sample][13],' --> ',datasetID)
+            finded=False
+            indexFinded=''
+
+            occ=[]
+            for i in range (0,len(dtset)-1):
+                if totSample[sample][13]==opt[i]:
+                    occ.append(i)
+            if len(occ)>2: #Delete after debug TODO
+                print('\n\nêêêêêêêêêêêêêê - Resultat pas possible !!!! 1 ')
+
+            if '_' in totSample[sample][0]:
+                spP=1
+            else:
+                spP=0
+            for occurence in occ:
+                if dstP[occurence]==spP:
+                    indexFinded==occurence
+                    datasetID=dtset[occurence]
+                    finded=True
+
+            if finded==True:
+                print(totSample[sample][13],' --> ',datasetID)
+            else:
+                print('\n\nêêêêêêêêêêêêêê - Resultat pas possible !!!! 2 ')
+
+            #Put sample in rst tab
+            rst[indexFinded][2].append(totSample[sample][0])
+
         else :
             opt.append(totSample[sample][13])
             dtset.append('dataset'+str(datasetID))
             sampledst='dataset'+str(datasetID)
             datasetID=datasetID+1
 
-    ## .. Put sample on rst tab
+            #Add on rst tab
 
-    #search if there is dst sample in rst tab
-    #--> yes : juste pu sample name on rst[3] list
-    #--> no : create a new dst entry un rst with sample name on rst[3]
+  
 
-    ## .. For each dataset, split single ans paired reads
 
 
 ############################
