@@ -30,6 +30,31 @@ tmpdir=outdir+'/working'
 
 #Construct files path here
 
+#Calcul percentage value : RULES THAT WE SET
+
+#.. Minimal quality required for ech base on the reads
+#Set the maximal error percentage authorized. 45 bp or less : 0.39811 (Q4), 200 bp or more : 0.1 (Q10)
+minLim=45
+maxLim=200
+minFpercent=0.39811
+maxFpercent=0.1
+limDifNt=maxLim-minLim
+limDifPercent=minFpercent-maxFpercent
+if limDifNt<=0 or limDifPercent<=0 :
+    print('\n&&&&&&&&&& Warning calculation error 1\n') #TODO delete after debug
+FpercentByNt=limDifPercent/limDifNt
+
+#.. Percentage of sequence length we want to trim according to reads length
+LminLim=50
+LmaxLim=150
+minPercentL=0.4
+maxPercentL=0.6
+limDifNtL=LmaxLim-LminLim
+limDifPercentL=minFpercentL-maxFpercentL
+if limDifNtL<=0 or limDifPercentL<=0 :
+    print('\n&&&&&&&&&& Warning calculation error 1\n') #TODO delete after debug
+LpercentByNt=limDifPercentL/limDifNtL
+
 ############################
 # FOUNCTIONS
 ############################
@@ -451,8 +476,7 @@ for sample in range(len(totSample)) :
 # + if overrepresented sequence in data where minlenght >100 bp : see if polyX nuceotidique sequence --> open fastqc zipped dir and read the info OR read on multiqc meta data
 # + if true qual at pos < 28 : see if some read on sample with bas qual < 28 OR red limit --> open fastqc zipped dir and read the info OR read on multiqc meta data
 #           : at the end juste -3 -5 ok, if in read peak ou si après trimming put quality treshord to red limit and % of base not on trheshold to 0
-dfopt='-5 -3 -M 28 -D --n_base_limit 0'
-undedupp=[]
+dfopt='-5 -3 -M 28 -u 0 -D -n 0'
 trashed=[]
 
 for sample in range(len(totSample)) :
@@ -504,7 +528,16 @@ for sample in range(len(totSample)) :
 
     #.... set the minimal (and maximal for sRNA) lenght of trimmed reads (default : 15) #TODO define for the other type of RNA
     if totSample[sample][11]=='mRNA':
-        percentage=((length-position)*0.6)/150
+        
+        if length<=LminLim:
+            percentage=minPercentL
+        else :
+            if length>=LmaxLim:
+                percentage=maxPercentL
+            else:
+                diffLength=LmaxLim-length
+                percentage=maxPercentL+(diffLength*LpercentByNt)
+
         finalLength=int(percentage*(length-position))
         if finalLength<15: #15 is default setting
             finalLength=15
@@ -532,6 +565,23 @@ for sample in range(len(totSample)) :
 
     #.. If pass the sRNA sequence content analyse (18-32 nt long un sRNA)
     if sampleTrash==False :  
+
+        #.... Set the quality threshold (if different for paired read ==> take the max)
+        if length>=maxLim :
+            maxFalsePercent=maxFpercent # maxFalsePercent is the maximum probability of nt is not the real (error during sequencing)
+        else:
+            if length<=minLim :
+                maxFalsePercent=minFpercent
+            else:
+                diffLength=maxLim-length
+                maxFalsePercent=maxFpercent+(diffLength*FpercentByNt)
+        
+        #Cacul the according quality Threshord
+        minQ=-10*(log10(maxFalsePercent))
+        #Put result on options
+        opt=opt+' -q '+str(minQ)
+
+
 
         #.... Did i put the -y option ? #Don't do for now, see later
         if length>100 :
@@ -619,7 +669,9 @@ print('**************************************\n\n')
 
 ## .. Do paired reads opt the same for pair of reads are on the same dataset at the end
 
-for sample in range(len(totSample)-1)
+#TODO TODO TODO make a founction to define between thze two value the one keeped
+
+for sample in range(len(totSample)-1):
 
     if '_1' in totSample[sample][0]:
         if totSample[sample][13] != totSample[sample+1][13]
@@ -634,10 +686,12 @@ for sample in range(len(totSample)-1)
         R1l=''
         R1b=''
         R1y=''
-        R2=''
-        R2=''
-        R2=''
-        R2=''
+        R1q=''
+        R2f=''
+        R2l=''
+        R2b=''
+        R2y=''
+        R2q=''
     # Compare values can be différent and decide the one to keep from each
         for i in range(7,(maxInd-1),2):
         #.. put values on the good variable
@@ -653,7 +707,10 @@ for sample in range(len(totSample)-1)
                         if optR1[i]=='-y':
                             R1y=True
                         else:
-                            print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : unknow option or fastp otion indice not set correctly') #TODO delete after debug
+                            if optR1[i]=='-q'
+                                R1q=int(optR1[i+1])
+                            else:
+                                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : unknow option or fastp otion indice not set correctly') #TODO delete after debug
 
             if optR2[i]=='-f':
                 R2f=int(optR2[i+1])
@@ -667,7 +724,10 @@ for sample in range(len(totSample)-1)
                         if optR2[i]=='-y':
                             R2y=True
                         else:
-                            print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : unknow option or fastp option indice not set correctly') #TODO delete after debug
+                            if optR2[i]=='-q'
+                                R2q=int(optR2[i+1])
+                            else:
+                                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : unknow option or fastp option indice not set correctly') #TODO delete after debug
         
         #.. compare each different options
         nbDiff=0
@@ -698,7 +758,7 @@ for sample in range(len(totSample)-1)
                 if R1l=='' :
                     finalopt=finalopt+' -l '+str(R2l)
                 if R2l=='' :  
-                    finalopt=finalopt+' -l '+str(R1f)
+                    finalopt=finalopt+' -l '+str(R1l)
 
 
         if R1b!='' or R2b!='':
@@ -722,6 +782,19 @@ for sample in range(len(totSample)-1)
                 optYadd=True
                 print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : -y option différent btwenn this two sample (median length one <100 other >100)',totSample[sample][0],totSample[sample+1][0])
 
+
+        if R1q!='' or R2q!='':
+            if R1q==R2q:
+                finalopt=finalopt+' -q '+str(R1q)
+            if R1q!=R2q and R1q!='' and R2q!='':
+                nbDiff=nbDiff+1
+                finalopt=finalopt+' -q '+str(max(R1q,R2q))
+            else:
+                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -q OPT')
+                if R1q=='' :
+                    finalopt=finalopt+' -q '+str(R2q)
+                if R2q=='' :  
+                    finalopt=finalopt+' -q '+str(R1q)
 
 
         if nbDiff==0 and optYadd==False:
