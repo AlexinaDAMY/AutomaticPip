@@ -920,7 +920,7 @@ for sample in range(0,len(totSample)):
             spList.append(totSample[sample][0])
             Entry.append(spList)
             rst.append(Entry)
-
+        
   
 print(rst)
 
