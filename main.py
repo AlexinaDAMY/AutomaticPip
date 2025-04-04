@@ -11,6 +11,7 @@ import sys
 import subprocess
 import csv
 import statistics
+from math import log10
 
 # ---- Set path
 
@@ -50,9 +51,9 @@ LmaxLim=150
 minPercentL=0.4
 maxPercentL=0.6
 limDifNtL=LmaxLim-LminLim
-limDifPercentL=minFpercentL-maxFpercentL
+limDifPercentL=maxPercentL-minPercentL
 if limDifNtL<=0 or limDifPercentL<=0 :
-    print('\n&&&&&&&&&& Warning calculation error 1\n') #TODO delete after debug
+    print('\n&&&&&&&&&& Warning calculation error 2\n') #TODO delete after debug
 LpercentByNt=limDifPercentL/limDifNtL
 
 ############################
@@ -68,6 +69,7 @@ LpercentByNt=limDifPercentL/limDifNtL
 # arg file : fomat, not empty, readable with ',' si csv, exist
 # arg repertory : exist
 # arg name : not exist output directory on output path with this name, if it's case asking to user if he want erase this output analyse
+# Sample to analyse : more than one (else bad list reading)
 
 ############################
 # Create symbolic links with Acc ID file + analyse if there are missing datas
@@ -189,7 +191,6 @@ for line in range(1,len(lines)):
 
         # ....newEntry[1] Technology used for sequencing
         newEntry.append(infos[3])
-        print('[[[[[[[[[[[[[[[[[[[[[               ',infos[3],'                ]]]]]]]]]]]]]]]]]]]]]')
 
         # ....newEntry[2] Total sequences count
         newEntry.append(float(infos[4]))
@@ -350,10 +351,10 @@ for sample in range (0,(len(totSample))) :
                 # add list of warn pos in read
 # +++++++++++++++++++++
 
-    Wcontent=totSample[sample][5]
+    Wcontent=totSample[sample][6]
 
 
-    Fcontent=totSample[sample][6]
+    Fcontent=totSample[sample][7]
 
 
     posW=[]
@@ -394,16 +395,16 @@ for sample in range (0,(len(totSample))) :
            
                         
                         
-    totSample[sample][5]=W
-    totSample[sample][5].append(posW)  
+    totSample[sample][6]=W
+    totSample[sample][6].append(posW)  
 
-    totSample[sample][6]=F
-    totSample[sample][6].append(posF)
+    totSample[sample][7]=F
+    totSample[sample][7].append(posF)
 
     # .... Adding polyX seq in overrepresented - Entry[5][1] 
 
     polyX=False
-    if totSample[sample][4][0]==True:
+    if totSample[sample][5][0]==True:
         fastqcPart=(fastqcInfo[12].split('>'))[0]
         fastqcReaded=fastqcPart.split('\n')
 
@@ -418,7 +419,7 @@ for sample in range (0,(len(totSample))) :
                 polyX=True
             #if len(nucleotide)==2 :  #TODO : -y in this case ?
                 #polyX='Maybe'
-    totSample[sample][4].append(polyX)
+    totSample[sample][5].append(polyX)
 
 
 
@@ -494,9 +495,9 @@ for sample in range(len(totSample)) :
     opt=dfopt
     
 
-    #.... Did I put the --adapter-for-pe option ?
+    #.... Did I put the --adapter-for-pe option ?  #TODO TODO TODO si single read et adapter ok ==> desactiver le trimming des adpter pour fastp
     if totSample[sample][4]==True :
-        if totSample[12]=='paired' :
+        if totSample[sample][12]=='paired' :
             opt=opt+' --detect_adapter_for_pe'
 
     length=round(totSample[sample][3])
@@ -529,14 +530,14 @@ for sample in range(len(totSample)) :
     #.... set the minimal (and maximal for sRNA) lenght of trimmed reads (default : 15) #TODO define for the other type of RNA
     if totSample[sample][11]=='mRNA':
         
-        if length<=LminLim:
+        if length!=LminLim:
+            diffLength=max(length,LminLim)-min(length,LminLim)
+            if length<LminLim:
+                percentage=minPercentL-(diffLength*LpercentByNt)
+            else :
+                percentage=minPercentL+(diffLength*LpercentByNt)
+        else:
             percentage=minPercentL
-        else :
-            if length>=LmaxLim:
-                percentage=maxPercentL
-            else:
-                diffLength=LmaxLim-length
-                percentage=maxPercentL+(diffLength*LpercentByNt)
 
         finalLength=int(percentage*(length-position))
         if finalLength<15: #15 is default setting
@@ -577,15 +578,21 @@ for sample in range(len(totSample)) :
                 maxFalsePercent=maxFpercent+(diffLength*FpercentByNt)
         
         #Cacul the according quality Threshord
-        minQ=-10*(log10(maxFalsePercent))
+        minQTot=-10*(log10(maxFalsePercent))
+        minQ=round(minQTot)
+        if minQ>10 :
+            minQ=10
         #Put result on options
         opt=opt+' -q '+str(minQ)
 
 
 
         #.... Did i put the -y option ? #Don't do for now, see later
-        if length>100 :
-            opt=opt+' -y -Y 1'
+        #if length>100 :
+            #opt=opt+' -y -Y 1'
+
+
+
             #diversityOption=True  #TODO TODO for length<100, change the % of minimal diversity according with length / change maximal authorized number of position with quality bad
         #else :
             #print('/////////////// ',totSample[sample][4])
@@ -615,7 +622,6 @@ for sample in range(len(totSample)) :
 print('\n-----------  SAMPLE(s) TRASHED FOR ANY REASON  ------')
 print(trashed)
 print('\nSample I cant deddup :')
-print(undedupp) #TOOD delete after debug
 
 ############################
 # Output file fill
@@ -674,133 +680,136 @@ print('**************************************\n\n')
 for sample in range(len(totSample)-1):
 
     if '_1' in totSample[sample][0]:
-        if totSample[sample][13] != totSample[sample+1][13]
-        optR1=(totSample[sample][13]).split(" ")
-        optR2=(totSample[sample+1][13]).split(" ")
+        if totSample[sample][13] != totSample[sample+1][13]:
+            optR1=(totSample[sample][13]).split(" ")
+            optR2=(totSample[sample+1][13]).split(" ")
 
-        print('~~~~~~~~~~ ONE AJUSTMENT MAKE : ',totSample[sample][0],totSample[sample][-2],totSample[sample][-1],' & ',totSample[sample+1][0],totSample[sample+1][-2],totSample[sample+1][-1])
+            print('~~~~~~~~~~ ONE AJUSTMENT MAKE : ',totSample[sample][0],totSample[sample][-2],totSample[sample][-1],' & ',totSample[sample+1][0],totSample[sample+1][-2],totSample[sample+1][-1])
 
-        finalopt=dfopt
-        maxInd=max(len(optR1),len(opt2))
-        R1f=''
-        R1l=''
-        R1b=''
-        R1y=''
-        R1q=''
-        R2f=''
-        R2l=''
-        R2b=''
-        R2y=''
-        R2q=''
-    # Compare values can be différent and decide the one to keep from each
-        for i in range(7,(maxInd-1),2):
-        #.. put values on the good variable
-            if optR1[i]=='-f':
-                R1f=int(optR1[i+1])
-            else :
-                if optR1[i]=='-l':
-                    R1l=int(optR1[i+1])
-                else:
-                    if optR1[i]=='-b':
-                        R1b=int(optR1[i+1])
-                    else:
-                        if optR1[i]=='-y':
-                            R1y=True
+            finalopt=dfopt
+            maxInd=max(len(optR1),len(opt2))
+            R1f=''
+            R1l=''
+            R1b=''
+            R1y=''
+            R1q=''
+            R2f=''
+            R2l=''
+            R2b=''
+            R2y=''
+            R2q=''
+        # Compare values can be différent and decide the one to keep from each
+            for i in range(10,(maxInd-1),2):
+
+                if i<=(len(optR1)-1):
+                #.. put values on the good variable
+                    if optR1[i]=='-f':
+                        R1f=int(optR1[i+1])
+                    else :
+                        if optR1[i]=='-l':
+                            R1l=int(optR1[i+1])
                         else:
-                            if optR1[i]=='-q'
-                                R1q=int(optR1[i+1])
+                            if optR1[i]=='-b':
+                                R1b=int(optR1[i+1])
                             else:
-                                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : unknow option or fastp otion indice not set correctly') #TODO delete after debug
+                                if optR1[i]=='-y':
+                                    R1y=True
+                                else:
+                                    if optR1[i]=='-q':
+                                        R1q=int(optR1[i+1])
+                                    else:
+                                        print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : unknow option or fastp otion indice not set correctly') #TODO delete after debug
 
-            if optR2[i]=='-f':
-                R2f=int(optR2[i+1])
-            else :
-                if optR2[i]=='-l':
-                    R2l=int(optR2[i+1])
-                else:
-                    if optR2[i]=='-b':
-                        R2b=int(optR2[i+1])
-                    else:
-                        if optR2[i]=='-y':
-                            R2y=True
+                if i<=(len(optR2)-1):
+                    if optR2[i]=='-f':
+                        R2f=int(optR2[i+1])
+                    else :
+                        if optR2[i]=='-l':
+                            R2l=int(optR2[i+1])
                         else:
-                            if optR2[i]=='-q'
-                                R2q=int(optR2[i+1])
+                            if optR2[i]=='-b':
+                                R2b=int(optR2[i+1])
                             else:
-                                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : unknow option or fastp option indice not set correctly') #TODO delete after debug
+                                if optR2[i]=='-y':
+                                    R2y=True
+                                else:
+                                    if optR2[i]=='-q':
+                                        R2q=int(optR2[i+1])
+                                    else:
+                                        print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : unknow option or fastp option indice not set correctly') #TODO delete after debug
         
-        #.. compare each different options
-        nbDiff=0
-        optYadd=False
+            #.. compare each different options
+            nbDiff=0
+            optYadd=False
 
-        if R1f!='' or R2f!='':
-            if R1f==R2f:
-                finalopt=finalopt+' -f '+str(R1f)
-            if R1f!=R2f and R1f!='' and R2f!='':
-                nbDiff=nbDiff+1
-                finalopt=finalopt+' -f '+str(max(R1f,R2f))
-            else:
-                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -f OPT')
-                if R1f=='' :
-                    finalopt=finalopt+' -f '+str(R2f)
-                if R2f=='' :   # So case R1f==R2f with '' is not treat
+            if R1f!='' or R2f!='':
+                if R1f==R2f:
                     finalopt=finalopt+' -f '+str(R1f)
+                if R1f!=R2f and R1f!='' and R2f!='':
+                    nbDiff=nbDiff+1
+                    finalopt=finalopt+' -f '+str(max(R1f,R2f))
+                else:
+                    print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -f OPT')
+                    if R1f=='' :
+                        finalopt=finalopt+' -f '+str(R2f)
+                    if R2f=='' :   # So case R1f==R2f with '' is not treat
+                        finalopt=finalopt+' -f '+str(R1f)
 
 
-        if R1l!='' or R2l!='':
-            if R1l==R2l:
-                finalopt=finalopt+' -l '+str(R1l)
-            if R1l!=R2l and R1l!='' and R2l!='':
-                nbDiff=nbDiff+1
-                finalopt=finalopt+' -l '+str(mean(R1l,R2l))
-            else:
-                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -l OPT')
-                if R1l=='' :
-                    finalopt=finalopt+' -l '+str(R2l)
-                if R2l=='' :  
+            if R1l!='' or R2l!='':
+                if R1l==R2l:
                     finalopt=finalopt+' -l '+str(R1l)
+                if R1l!=R2l and R1l!='' and R2l!='':
+                    nbDiff=nbDiff+1
+                    finalopt=finalopt+' -l '+str(mean(R1l,R2l))
+                else:
+                    print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -l OPT')
+                    if R1l=='' :
+                        finalopt=finalopt+' -l '+str(R2l)
+                    if R2l=='' :  
+                        finalopt=finalopt+' -l '+str(R1l)
 
 
-        if R1b!='' or R2b!='':
-            if R1b==R2b:
-                finalopt=finalopt+' -b '+str(R1b)
-            if R1b!=R2b and R1b!='' and R2b!='':
-                nbDiff=nbDiff+1
-                finalopt=finalopt+' -b '+str(min(R1b,R2b))
-            else:
-                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -b OPT')
-                if R1b=='' :
-                    finalopt=finalopt+' -b '+str(R2b)
-                if R2b=='' :  
+            if R1b!='' or R2b!='':
+                if R1b==R2b:
                     finalopt=finalopt+' -b '+str(R1b)
+                if R1b!=R2b and R1b!='' and R2b!='':
+                    nbDiff=nbDiff+1
+                    finalopt=finalopt+' -b '+str(min(R1b,R2b))
+                else:
+                    print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -b OPT')
+                    if R1b=='' :
+                        finalopt=finalopt+' -b '+str(R2b)
+                    if R2b=='' :  
+                        finalopt=finalopt+' -b '+str(R1b)
 
-        if R1y!='' or R1y!='':
-            if R1y==R2y:
-                finalopt=finalopt+' -y -Y 1'
-            else:
-                finalopt=finalopt+' -y -Y 1'
-                optYadd=True
-                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : -y option différent btwenn this two sample (median length one <100 other >100)',totSample[sample][0],totSample[sample+1][0])
+            if R1y!='' or R1y!='':
+                if R1y==R2y:
+                    finalopt=finalopt+' -y -Y 1'
+                else:
+                    finalopt=finalopt+' -y -Y 1'
+                    optYadd=True
+                    print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : -y option différent btwenn this two sample (median length one <100 other >100)',totSample[sample][0],totSample[sample+1][0])
 
 
-        if R1q!='' or R2q!='':
-            if R1q==R2q:
-                finalopt=finalopt+' -q '+str(R1q)
-            if R1q!=R2q and R1q!='' and R2q!='':
-                nbDiff=nbDiff+1
-                finalopt=finalopt+' -q '+str(max(R1q,R2q))
-            else:
-                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -q OPT')
-                if R1q=='' :
-                    finalopt=finalopt+' -q '+str(R2q)
-                if R2q=='' :  
+            if R1q!='' or R2q!='':
+                if R1q==R2q:
                     finalopt=finalopt+' -q '+str(R1q)
+                if R1q!=R2q and R1q!='' and R2q!='':
+                    nbDiff=nbDiff+1
+                    finalopt=finalopt+' -q '+str(max(R1q,R2q))
+                else:
+                    print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : This case not must happen for paired read and -q OPT')
+                    if R1q=='' :
+                        finalopt=finalopt+' -q '+str(R2q)
+                    if R2q=='' :  
+                        finalopt=finalopt+' -q '+str(R1q)
 
 
-        if nbDiff==0 and optYadd==False:
-            print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : I find différent fastP option bus after parse them not diff !!!', optR1,optR2)
+            if nbDiff==0 and optYadd==False:
+                print('\n\n @@@@@@@@@@@@@@@@@@ BE AWARE : I find différent fastP option bus after parse them not diff !!!', optR1,optR2)
 
-        print('final gived option : ', finalopt)
+            print('final gived option : ', finalopt)
 
 
 
@@ -828,7 +837,7 @@ opt=[]
 dtset=[]
 dstP=[]
 
-for sample in range(0,len(totSample)-1):
+for sample in range(0,len(totSample)):
 
     # .. Give the dataset name to the sample
 
@@ -850,33 +859,43 @@ for sample in range(0,len(totSample)-1):
         spList=[]
         Entry.append(sampledst)
         Entry.append(dstP[0])
+        Entry.append(opt[0])
         spList.append(totSample[sample][0])
         Entry.append(spList)
         rst.append(Entry)
 
+        print(opt,dtset,dstP)
 
     else:
         #Search if sample opyt in opt tab with opt.index(sampleOPT) --> treat the result, see what founction return if not find (if error, use if opsample in opt before)
-        if totSample[sample][13] in opt :
+        if totSample[sample][13] in opt :  #TODO sauv - info : sauv juste les options qui ne sont pas par défautin opt seulemnt
             finded=False
             indexFinded=''
-
             occ=[]
-            for i in range (0,len(dtset)-1):
+
+            for i in range(len(dtset)):
                 if totSample[sample][13]==opt[i]:
-                    occ.append(i)
+                    occ.append(int(i))
             if len(occ)>2: #Delete after debug TODO
                 print('\n\nêêêêêêêêêêêêêê - Resultat pas possible !!!! 1 ')
 
-            if '_' in totSample[sample][0]:
-                spP=1
+            print('--- Finded occurences : ',occ)
+
+            if len(occ)==2 : #Two dataset with the same options : can occur when read is paired
+                if '_' in totSample[sample][0]:
+                    spP=1
+                else:
+                    spP=0
+                
+                for occurence in occ:
+                    if dstP[occurence]==spP:
+                        indexFinded==occurence
+                        datasetID=dtset[occurence]
+                        finded=True
             else:
-                spP=0
-            for occurence in occ:
-                if dstP[occurence]==spP:
-                    indexFinded==occurence
-                    datasetID=dtset[occurence]
-                    finded=True
+                indexFinded=occ[0]
+                datasetID=dtset[occ[0]]
+                finded=True
 
             if finded==True:
                 print(totSample[sample][13],' --> ',datasetID)
@@ -884,7 +903,7 @@ for sample in range(0,len(totSample)-1):
                 print('\n\nêêêêêêêêêêêêêê - Resultat pas possible !!!! 2 ')
 
             #Put sample in rst tab
-            rst[indexFinded][2].append(totSample[sample][0])
+            rst[indexFinded][3].append(totSample[sample][0])
 
         else :
             opt.append(totSample[sample][13])
@@ -893,9 +912,17 @@ for sample in range(0,len(totSample)-1):
             datasetID=datasetID+1
 
             #Add on rst tab
+            Entry=[]
+            spList=[]
+            Entry.append(sampledst)
+            Entry.append(dstP[-1]) # The last I put on tabs
+            Entry.append(opt[-1])
+            spList.append(totSample[sample][0])
+            Entry.append(spList)
+            rst.append(Entry)
 
   
-
+print(rst)
 
 
 ############################
